@@ -1,0 +1,189 @@
+
+================================================================================
+  JOBBRIDGE ALBERTA - COMPREHENSIVE DATA SUMMARY REPORT
+================================================================================
+
+Generated: 2026-02-18 22:40:47
+Data Source: Job Bank Canada (Government of Canada)
+
+================================================================================
+  DATASET OVERVIEW
+================================================================================
+
+Total Jobs Collected:              5,132
+Unique Companies:                  1,533
+Unique Job Titles:                 645
+Provinces/Territories Covered:     3
+Cities Covered:                    1097
+
+Data Completeness:                 66.6%
+
+================================================================================
+  GEOGRAPHIC DISTRIBUTION
+================================================================================
+
+Top 10 Provinces by Job Count:
+----------------------------------------------------------------------
+   1. Alberta                           2,116 jobs ( 41.2%)
+   2. British Columbia                  2,116 jobs ( 41.2%)
+   3. Manitoba                            825 jobs ( 16.1%)
+
+Top 10 Cities by Job Count:
+----------------------------------------------------------------------
+   1. Toronto, ON                         540 jobs ( 10.5%)
+   2. Calgary, AB                         117 jobs (  2.3%)
+   3. Vancouver, BC                        91 jobs (  1.8%)
+   4. Saskatoon, SK                        72 jobs (  1.4%)
+   5. Mississauga, ON                      53 jobs (  1.0%)
+   6. Regina, SK                           52 jobs (  1.0%)
+   7. Edmonton, AB                         50 jobs (  1.0%)
+   8. Montréal, QC                         48 jobs (  0.9%)
+   9. Burnaby, BC                          45 jobs (  0.9%)
+  10. Winnipeg, MB                         39 jobs (  0.8%)
+
+================================================================================
+  JOB CATEGORIES
+================================================================================
+
+  Management                      1,224 jobs ( 23.9%)
+  Trades & Technical                876 jobs ( 17.1%)
+  Technology & IT                   822 jobs ( 16.0%)
+  Other                             667 jobs ( 13.0%)
+  Education                         492 jobs (  9.6%)
+  Business & Finance                458 jobs (  8.9%)
+  Healthcare                        410 jobs (  8.0%)
+  Service & Retail                  183 jobs (  3.6%)
+
+================================================================================
+  TOP HIRING COMPANIES
+================================================================================
+
+Top 10 Companies:
+----------------------------------------------------------------------
+   1. Employer details
+
+
+Scotiabank                    202 positions
+   2. Employer details
+
+
+RBC Dominion Securities       133 positions
+   3. Employer details
+
+
+Kognitive Sales Solutions      78 positions
+   4. Employer details
+
+
+NL Health Services             69 positions
+   5. Employer details
+
+
+VON Canada                     53 positions
+   6. Employer details
+
+
+Saskatchewan Health Author     38 positions
+   7. Employer details
+
+
+TD Bank                        31 positions
+   8. Employer details
+
+
+MCDONALD'S RESTAURANT          24 positions
+   9. Employer details
+
+
+Island Health                  24 positions
+  10. Employer details
+
+
+Kitasoo Development Corpor     23 positions
+
+================================================================================
+  MOST COMMON JOB TITLES
+================================================================================
+
+Top 10 Job Titles:
+----------------------------------------------------------------------
+   1. carpenter                                             141 postings
+   2. accountant                                            139 postings
+   3. software developer                                    118 postings
+   4. office administrator                                  108 postings
+   5. plumber                                               106 postings
+   6. financial analyst                                     101 postings
+   7. early childhood educator (ECE)                         90 postings
+   8. electrician                                            84 postings
+   9. front desk agent                                       67 postings
+  10. administrative manager                                 62 postings
+
+================================================================================
+  DATA QUALITY METRICS
+================================================================================
+
+Field Completeness:
+  ✓ title                      5,132 /  5,132 (100.0%)
+  ✓ company                    5,132 /  5,132 (100.0%)
+  ✓ location                   5,063 /  5,132 ( 98.7%)
+  ✓ city                       5,063 /  5,132 ( 98.7%)
+  ✗ postal_code                    0 /  5,132 (  0.0%)
+  ✗ responsibilities           1,871 /  5,132 ( 36.5%)
+  ✓ url                        5,132 /  5,132 (100.0%)
+  ✓ page_number                5,132 /  5,132 (100.0%)
+  ✓ scraped_date               5,132 /  5,132 (100.0%)
+  ✓ province                   5,057 /  5,132 ( 98.5%)
+  ✗ salary                         0 /  5,132 (  0.0%)
+  ✗ education                      0 /  5,132 (  0.0%)
+  ✗ experience                     0 /  5,132 (  0.0%)
+  ✓ job_category               5,132 /  5,132 (100.0%)
+
+================================================================================
+  DATA COLLECTION STATISTICS
+================================================================================
+
+Collection Method:         Comprehensive systematic search
+Search Coverage:           All provinces × Multiple job categories
+Duplicate Removal:         Automatic (by URL)
+Data Source:               Job Bank Canada (official government database)
+Scraping Period:           2026-02-02 15:11:21 to 2026-02-18 20:20:47
+
+================================================================================
+  PROJECT INFORMATION
+================================================================================
+
+Project Name:              JobBridge Alberta
+Purpose:                   AI-Powered Job Matching Platform
+Technology:                Graph Neural Networks + NLP
+Student:                   Showrav Deb Chowdhury
+Institution:               Concordia University of Edmonton
+Supervisor:                [Professor Name]
+
+================================================================================
+  NEXT STEPS
+================================================================================
+
+1. Data Cleaning:
+   - Standardize location names
+   - Remove duplicates
+   - Handle missing values
+   - Validate company names
+
+2. NLP Processing:
+   - Extract skills from job descriptions
+   - Categorize jobs using BERT embeddings
+   - Build skill taxonomy
+
+3. Graph Construction:
+   - Create job-skill relationship graph
+   - Build candidate-job matching network
+   - Implement recommendation system
+
+4. Model Training:
+   - Train Graph Neural Network
+   - Validate with real job matching scenarios
+   - Optimize for Alberta job market
+
+================================================================================
+  END OF REPORT
+================================================================================

@@ -1,0 +1,9 @@
+streamlit
+chromadb
+sentence-transformers
+anthropic
+groq
+pandas
+PyPDF2
+python-dotenv
+altair

@@ -1,0 +1,20 @@
+# API Keys — never upload these
+.env
+api_key.env
+
+# Python
+venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# Large data files — too big for GitHub
+data/vectordb/
+data/jobs.db
+
+# VS Code
+.vscode/
+
+# Windows
+Thumbs.db
+Desktop.ini

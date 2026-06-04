@@ -280,6 +280,59 @@ def create_interactive_bar_chart(data, x_col, y_col, x_label, y_label):
 
 
 # ── AI Agent Functions (Groq — Free) ─────────────────────────────────────────
+def convert_to_pdf(text, filename):
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer
+    from reportlab.lib.units import inch
+    from reportlab.lib.enums import TA_LEFT
+    import io
+
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buffer,
+        pagesize=letter,
+        rightMargin=inch,
+        leftMargin=inch,
+        topMargin=inch,
+        bottomMargin=inch
+    )
+
+    styles = getSampleStyleSheet()
+    normal_style = ParagraphStyle(
+        'CustomNormal',
+        parent=styles['Normal'],
+        fontSize=11,
+        leading=16,
+        spaceAfter=6,
+        fontName='Helvetica'
+    )
+    heading_style = ParagraphStyle(
+        'CustomHeading',
+        parent=styles['Heading1'],
+        fontSize=13,
+        leading=18,
+        spaceAfter=8,
+        fontName='Helvetica-Bold'
+    )
+
+    story = []
+    for line in text.split('\n'):
+        line = line.strip()
+        if not line:
+            story.append(Spacer(1, 8))
+        elif line.startswith('**') and line.endswith('**'):
+            clean = line.replace('**', '')
+            story.append(Paragraph(clean, heading_style))
+        elif line.isupper() and len(line) < 50:
+            story.append(Paragraph(line, heading_style))
+        else:
+            safe_line = line.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            story.append(Paragraph(safe_line, normal_style))
+
+    doc.build(story)
+    buffer.seek(0)
+    return buffer
 def get_groq_client():
     return Groq(api_key=GROQ_API_KEY)
 
@@ -674,49 +727,160 @@ with tab1:
                     "💬  Chat with Agent"
                 ])
 
-                # Tab A — Tailor Resume (FIX 5: full resume)
+                # # Tab A — Tailor Resume (FIX 5: full resume)
+                # with a_tab1:
+                #     st.markdown(f"Rewriting your resume specifically for **{title}** at **{company}**")
+                #     if not resume:
+                #         st.warning("⚠️ Upload a resume or type your skills above first.")
+                #     else:
+                #         if st.button("✨ Generate Full Tailored Resume", key=f"tailor_{i}", type="primary"):
+                #             with st.spinner("Writing your complete tailored resume... (30-45 seconds)"):
+                #                 tailored = tailor_resume(resume, doc)
+                #                 st.session_state.tailored_resume[i] = tailored
+
+                #         if st.session_state.tailored_resume.get(i):
+                #             st.success("✅ Full tailored resume ready!")
+                #             st.markdown(f"<div class='output-box'>{st.session_state.tailored_resume[i]}</div>", unsafe_allow_html=True)
+                #             st.download_button(
+                #                 "⬇️ Download Tailored Resume (.txt)",
+                #                 data=st.session_state.tailored_resume[i],
+                #                 file_name=f"resume_{title.replace(' ','_')}_{company.replace(' ','_')}.txt",
+                #                 mime="text/plain",
+                #                 key=f"dl_resume_{i}"
+                #             )
+                # Tab A — Tailor Resume with Editable Text + PDF Download
                 with a_tab1:
-                    st.markdown(f"Rewriting your resume specifically for **{title}** at **{company}**")
+                    st.markdown(f"Tailoring your resume specifically for **{title}** at **{company}**")
                     if not resume:
                         st.warning("⚠️ Upload a resume or type your skills above first.")
                     else:
                         if st.button("✨ Generate Full Tailored Resume", key=f"tailor_{i}", type="primary"):
-                            with st.spinner("Writing your complete tailored resume... (30-45 seconds)"):
+                            with st.spinner("AI is writing your full tailored resume... (may take 30-45 seconds)"):
                                 tailored = tailor_resume(resume, doc)
                                 st.session_state.tailored_resume[i] = tailored
 
                         if st.session_state.tailored_resume.get(i):
-                            st.success("✅ Full tailored resume ready!")
-                            st.markdown(f"<div class='output-box'>{st.session_state.tailored_resume[i]}</div>", unsafe_allow_html=True)
-                            st.download_button(
-                                "⬇️ Download Tailored Resume (.txt)",
-                                data=st.session_state.tailored_resume[i],
-                                file_name=f"resume_{title.replace(' ','_')}_{company.replace(' ','_')}.txt",
-                                mime="text/plain",
-                                key=f"dl_resume_{i}"
+                            st.success("✅ Full tailored resume ready! You can edit it below before downloading.")
+
+                            # Editable text area
+                            edited_resume = st.text_area(
+                                "✏️ Edit your resume here",
+                                value=st.session_state.tailored_resume[i],
+                                height=500,
+                                key=f"edit_resume_{i}",
+                                label_visibility="visible"
                             )
 
-                # Tab B — Cover Letter
+                            # Save edits back to session state
+                            st.session_state.tailored_resume[i] = edited_resume
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+
+                            # Download buttons side by side
+                            dl_col1, dl_col2 = st.columns(2)
+
+                            with dl_col1:
+                                # Download as PDF
+                                pdf_buffer = convert_to_pdf(
+                                    edited_resume,
+                                    f"resume_{title}_{company}"
+                                )
+                                st.download_button(
+                                    "⬇️ Download as PDF",
+                                    data=pdf_buffer,
+                                    file_name=f"resume_{title.replace(' ','_')}_{company.replace(' ','_')}.pdf",
+                                    mime="application/pdf",
+                                    key=f"dl_resume_pdf_{i}",
+                                    type="primary"
+                                )
+
+                            with dl_col2:
+                                # Download as TXT
+                                st.download_button(
+                                    "⬇️ Download as TXT",
+                                    data=edited_resume,
+                                    file_name=f"resume_{title.replace(' ','_')}_{company.replace(' ','_')}.txt",
+                                    mime="text/plain",
+                                    key=f"dl_resume_txt_{i}"
+                                )
+
+                # Tab B — Cover Letter with Editable Text + PDF Download
                 with a_tab2:
                     st.markdown(f"Writing a cover letter for **{title}** at **{company}**")
                     if not resume:
                         st.warning("⚠️ Upload a resume or type your skills above first.")
                     else:
                         if st.button("✨ Generate Cover Letter", key=f"cover_{i}", type="primary"):
-                            with st.spinner("Writing your cover letter..."):
+                            with st.spinner("AI is writing your cover letter..."):
                                 letter = write_cover_letter(resume, doc, company, title)
                                 st.session_state.cover_letter[i] = letter
 
                         if st.session_state.cover_letter.get(i):
-                            st.success("✅ Cover letter ready!")
-                            st.markdown(f"<div class='output-box'>{st.session_state.cover_letter[i]}</div>", unsafe_allow_html=True)
-                            st.download_button(
-                                "⬇️ Download Cover Letter (.txt)",
-                                data=st.session_state.cover_letter[i],
-                                file_name=f"cover_letter_{company.replace(' ','_')}.txt",
-                                mime="text/plain",
-                                key=f"dl_cover_{i}"
+                            st.success("✅ Cover letter ready! You can edit it below before downloading.")
+
+                            # Editable text area
+                            edited_letter = st.text_area(
+                                "✏️ Edit your cover letter here",
+                                value=st.session_state.cover_letter[i],
+                                height=400,
+                                key=f"edit_cover_{i}",
+
+                                label_visibility="visible"
                             )
+
+                            # Save edits back to session state
+                            st.session_state.cover_letter[i] = edited_letter
+
+                            st.markdown("<br>", unsafe_allow_html=True)
+
+                            # Download buttons side by side
+                            dl_col1, dl_col2 = st.columns(2)
+
+                            with dl_col1:
+                                # Download as PDF
+                                pdf_buffer = convert_to_pdf(
+                                    edited_letter,
+                                    f"cover_letter_{company}"
+                                )
+                                st.download_button(
+                                    "⬇️ Download as PDF",
+                                    data=pdf_buffer,
+                                    file_name=f"cover_letter_{company.replace(' ','_')}.pdf",
+                                    mime="application/pdf",
+                                    key=f"dl_cover_pdf_{i}",
+                                    type="primary"
+                                )
+
+                            with dl_col2:
+                                # Download as TXT
+                                st.download_button(
+                                    "⬇️ Download as TXT",
+                                    data=edited_letter,
+                                    file_name=f"cover_letter_{company.replace(' ','_')}.txt",
+                                    mime="text/plain",
+                                    key=f"dl_cover_txt_{i}"
+                                )
+                # # Tab B — Cover Letter
+                # with a_tab2:
+                #     st.markdown(f"Writing a cover letter for **{title}** at **{company}**")
+                #     if not resume:
+                #         st.warning("⚠️ Upload a resume or type your skills above first.")
+                #     else:
+                #         if st.button("✨ Generate Cover Letter", key=f"cover_{i}", type="primary"):
+                #             with st.spinner("Writing your cover letter..."):
+                #                 letter = write_cover_letter(resume, doc, company, title)
+                #                 st.session_state.cover_letter[i] = letter
+
+                #         if st.session_state.cover_letter.get(i):
+                #             st.success("✅ Cover letter ready!")
+                #             st.markdown(f"<div class='output-box'>{st.session_state.cover_letter[i]}</div>", unsafe_allow_html=True)
+                #             st.download_button(
+                #                 "⬇️ Download Cover Letter (.txt)",
+                #                 data=st.session_state.cover_letter[i],
+                #                 file_name=f"cover_letter_{company.replace(' ','_')}.txt",
+                #                 mime="text/plain",
+                #                 key=f"dl_cover_{i}"
+                #             )
 
                 # Tab C — Chat
                 with a_tab3:

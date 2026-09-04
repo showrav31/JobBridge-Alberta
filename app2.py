@@ -16,11 +16,6 @@ import streamlit.components.v1 as components
 from auto_apply import extract_application_email, send_application_email, auto_fill_web_form
 from dotenv import load_dotenv
 load_dotenv()
-import streamlit as st
-if "ANTHROPIC_API_KEY" in st.secrets:
-    os.environ["ANTHROPIC_API_KEY"] = st.secrets["ANTHROPIC_API_KEY"]
-if "GROQ_API_KEY" in st.secrets:
-    os.environ["GROQ_API_KEY"] = st.secrets["GROQ_API_KEY"]
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
@@ -199,6 +194,7 @@ def load_db_stats():
 model = load_model()
 collection = load_vectordb()
 total_jobs, total_companies, province_counts, category_counts = load_db_stats()
+init_feedback_table()
 
 
 # ── Core Helpers ──────────────────────────────────────────────────────────────
@@ -218,6 +214,17 @@ def find_jobs(input_text, num_results, province_filter="All"):
         where=where
     )
     return results
+def find_jobs(input_text, num_results, province_filter="All"):
+    embedding = model.encode(input_text).tolist()
+    where = {"province": province_filter} if province_filter != "All" else None
+    results = collection.query(
+        query_embeddings=[embedding],
+        n_results=num_results,
+        where=where
+    )
+    return results
+
+# 👇 PASTE THE TWO NEW FUNCTIONS RIGHT HERE 👇
 
 def init_feedback_table():
     conn = sqlite3.connect('data/jobs.db')
@@ -243,9 +250,6 @@ def save_feedback(job_title, company, matched_skills, rating):
     conn.commit()
     conn.close()
 
-# Function is now defined above this point, so it's safe to call here
-init_feedback_table()
-
 
 def get_ai_explanation(input_text, job_results):
     # FIX 3: Uses ALL matched jobs as context
@@ -270,7 +274,7 @@ Based on ALL the jobs above, respond in EXACTLY this format:
 [List 2-3 skills the candidate should develop to be competitive across ALL these roles in Alberta.]
 
 **CAREER ADVICE:**
-[Write 2-3 actionable sentences of career advice specific to the Alberta/Canadian job market. If the candidate's profile mentions any scholarships, awards, certifications, or funded programs, explicitly reference how they can leverage that credential in applications and interviews.]
+[2-3 actionable sentences based on ALL these postings and the Alberta job market.]
 
 Be specific, encouraging, and practical."""
 
@@ -333,12 +337,10 @@ def extract_skills_from_text(text, vocab):
         if re.search(pattern, text_lower):
             found.append(skill)
     return found
+
 SOFT_SKILLS = {
     "communication", "problem solving", "time management", "teamwork",
-    "critical thinking", "attention to detail", "organization", "adaptability",
-    "project management", "leadership", "team management", "supervision",
-    "staff scheduling", "performance management", "change management",
-    "strategic planning", "budget management", "operations management"
+    "critical thinking", "attention to detail", "organization", "adaptability"
 }
 
 def get_career_pathway(resume_text, top_k=5):
@@ -353,6 +355,10 @@ def get_career_pathway(resume_text, top_k=5):
     if not candidate_skills:
         return [], []
 
+    # Only SPECIFIC (non-soft) skills drive the ranking. Soft skills like
+    # "communication" appear in almost every job title's required-skill set,
+    # so including them in the averaged vector lets generic overlap dominate
+    # and drown out technical/domain signal.
     specific_skills = [s for s in candidate_skills if s not in SOFT_SKILLS]
     ranking_skills = specific_skills if specific_skills else candidate_skills
 
@@ -376,17 +382,15 @@ def get_career_pathway(resume_text, top_k=5):
         matched = required & candidate_set
         matched_specific = matched - SOFT_SKILLS
 
-        # The ONLY quality gate: the job must share at least one real,
-        # specific skill with the candidate. No absolute score cutoff —
-        # GCN cosine similarity isn't on a calibrated 0-100% scale, so a
-        # hard percentage floor can (and did) cut off relevant results.
+        # Require at least one SPECIFIC skill overlap so generic soft-skill
+        # matches alone can't surface an unrelated role.
         if not matched_specific and specific_skills:
             continue
 
         missing = required - candidate_set
         results.append({
             'title': title.title(),
-            'match_score': max(0.0, round(float(score) * 100, 1)),  # clip for display only
+            'match_score': round(float(score) * 100, 1),
             'matched_skills': list(matched),
             'missing_skills': list(missing)
         })
@@ -394,62 +398,6 @@ def get_career_pathway(resume_text, top_k=5):
             break
 
     return candidate_skills, results
-# def get_career_pathway(resume_text, top_k=5):
-#     graph_data = load_career_graph()
-#     embeddings = graph_data['embeddings']
-#     jobtitle_to_idx = graph_data['jobtitle_to_idx']
-#     skill_to_idx = graph_data['skill_to_idx']
-#     job_to_skills = graph_data['job_to_skills']
-#     skill_vocab = graph_data['skill_vocab']
-
-#     candidate_skills = extract_skills_from_text(resume_text, skill_vocab)
-#     if not candidate_skills:
-#         return [], []
-
-#     # Only SPECIFIC (non-soft) skills drive the ranking. Soft skills like
-#     # "communication" appear in almost every job title's required-skill set,
-#     # so including them in the averaged vector lets generic overlap dominate
-#     # and drown out technical/domain signal.
-#     specific_skills = [s for s in candidate_skills if s not in SOFT_SKILLS]
-#     ranking_skills = specific_skills if specific_skills else candidate_skills
-
-#     skill_indices = [skill_to_idx[s] for s in ranking_skills]
-#     candidate_vector = embeddings[skill_indices].mean(axis=0)
-
-#     idx_to_jobtitle = {v: k for k, v in jobtitle_to_idx.items()}
-#     job_indices = list(jobtitle_to_idx.values())
-#     job_embeddings = embeddings[job_indices]
-
-#     norms = np.linalg.norm(job_embeddings, axis=1) * np.linalg.norm(candidate_vector)
-#     similarities = (job_embeddings @ candidate_vector) / (norms + 1e-8)
-
-#     ranked = sorted(zip(job_indices, similarities), key=lambda x: -x[1])
-
-#     results = []
-#     candidate_set = set(candidate_skills)
-#     for job_idx, score in ranked:
-#         title = idx_to_jobtitle[job_idx]
-#         required = job_to_skills.get(title, set())
-#         matched = required & candidate_set
-#         matched_specific = matched - SOFT_SKILLS
-
-#         # Require at least one SPECIFIC skill overlap so generic soft-skill
-#         # matches alone can't surface an unrelated role.
-#         if not matched_specific and specific_skills:
-#             continue
-
-#         missing = required - candidate_set
-#         results.append({
-#             'title': title.title(),
-#             'match_score': round(float(score) * 100, 1),
-#             'matched_skills': list(matched),
-#             'missing_skills': list(missing)
-#         })
-#         if len(results) >= top_k:
-#             break
-
-#     return candidate_skills, results
-
 def build_pathway_network_html(candidate_skills, pathway_results):
     from pyvis.network import Network
     import tempfile
@@ -486,6 +434,46 @@ def build_pathway_network_html(candidate_skills, pathway_results):
         html_content = open(tmp.name, 'r', encoding='utf-8').read()
 
     return html_content
+
+
+# def get_career_pathway(resume_text, top_k=5):
+#     graph_data = load_career_graph()
+#     embeddings = graph_data['embeddings']
+#     jobtitle_to_idx = graph_data['jobtitle_to_idx']
+#     skill_to_idx = graph_data['skill_to_idx']
+#     job_to_skills = graph_data['job_to_skills']
+#     skill_vocab = graph_data['skill_vocab']
+
+#     candidate_skills = extract_skills_from_text(resume_text, skill_vocab)
+#     if not candidate_skills:
+#         return [], []
+
+#     skill_indices = [skill_to_idx[s] for s in candidate_skills]
+#     candidate_vector = embeddings[skill_indices].mean(axis=0)
+
+#     idx_to_jobtitle = {v: k for k, v in jobtitle_to_idx.items()}
+#     job_indices = list(jobtitle_to_idx.values())
+#     job_embeddings = embeddings[job_indices]
+
+#     norms = np.linalg.norm(job_embeddings, axis=1) * np.linalg.norm(candidate_vector)
+#     similarities = (job_embeddings @ candidate_vector) / (norms + 1e-8)
+
+#     ranked = sorted(zip(job_indices, similarities), key=lambda x: -x[1])
+
+#     results = []
+#     for job_idx, score in ranked[:top_k]:
+#         title = idx_to_jobtitle[job_idx]
+#         required = job_to_skills.get(title, set())
+#         missing = required - set(candidate_skills)
+#         matched = required & set(candidate_skills)
+#         results.append({
+#             'title': title.title(),
+#             'match_score': round(float(score) * 100, 1),
+#             'matched_skills': list(matched),
+#             'missing_skills': list(missing)
+#         })
+
+#     return candidate_skills, results
 
 
 # ── AI Agent Functions (Groq — Free) ─────────────────────────────────────────
@@ -542,7 +530,6 @@ def convert_to_pdf(text, filename):
     doc.build(story)
     buffer.seek(0)
     return buffer
-
 def get_groq_client():
     return Groq(api_key=GROQ_API_KEY)
 
@@ -674,7 +661,7 @@ if 'chat_history' not in st.session_state:
 if 'pathway_results' not in st.session_state:
     st.session_state.pathway_results = None
 if 'pathway_skills' not in st.session_state:
-    st.session_state.pathway_skills = None
+    st.session_state.pathway_skills = None    
 
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
@@ -749,8 +736,9 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ── Tabs ──────────────────────────────────────────────────────────────────────
-tab1, tab2, tab3 = st.tabs(["🔍  Job Matcher", "📊  Market Insights", "🧠  Career Pathway (GNN)"])
+# tab1, tab2 = st.tabs(["🔍  Job Matcher", "📊  Market Insights"])
 
+tab1, tab2, tab3 = st.tabs(["🔍  Job Matcher", "📊  Market Insights", "🧠  Career Pathway (GNN)"])
 # ════════════════════════════════════════════════════════════════════════════════
 # TAB 1 — JOB MATCHER
 # ════════════════════════════════════════════════════════════════════════════════
@@ -767,6 +755,7 @@ with tab1:
             resume_text = extract_pdf_text(uploaded_file)
             st.session_state.current_resume = resume_text
             with st.expander("👁️ Preview extracted text (Full Resume)"):
+                # FIX 2: Full resume shown in scrollable box
                 st.markdown(f"""
 <div style='background:#FFFFFF; border:1px solid #E2E8F0; border-radius:8px; padding:16px;
             max-height:400px; overflow-y:auto; font-size:0.85rem; color:#475569;
@@ -903,6 +892,7 @@ with tab1:
             btn1, btn2 = st.columns([1, 1])
 
             with btn1:
+                # FIX 6: Apply button with real job URL
                 if job_url and str(job_url).startswith('http'):
                     st.markdown(f"""
 <a href='{job_url}' target='_blank' style='
@@ -918,12 +908,11 @@ with tab1:
                     st.markdown("<span style='font-size:0.85rem; color:#94A3B8; padding:12px 0; display:block;'>No direct link available</span>", unsafe_allow_html=True)
 
             with btn2:
+                # FIX 4: AI Agent button per job card
                 agent_label = "❌ Close AI Agent" if st.session_state.agent_open.get(i, False) else "🤖 Launch AI Agent"
                 if st.button(agent_label, key=f"agent_btn_{i}"):
                     st.session_state.agent_open[i] = not st.session_state.agent_open.get(i, False)
                     st.rerun()
-
-            # Feedback buttons
             fb_col1, fb_col2, fb_col3 = st.columns([1, 1, 4])
             with fb_col1:
                 if st.button("👍", key=f"fb_up_{i}"):
@@ -932,7 +921,7 @@ with tab1:
             with fb_col2:
                 if st.button("👎", key=f"fb_down_{i}"):
                     save_feedback(title, company, [], 0)
-                    st.toast("Thanks for the feedback!")
+                    st.toast("Thanks for the feedback!")            
 
             # AI Agent Panel — opens directly below this job card
             if st.session_state.agent_open.get(i, False):
@@ -942,13 +931,39 @@ with tab1:
 </div>
                 """, unsafe_allow_html=True)
 
+                # a_tab1, a_tab2, a_tab3 = st.tabs([
+                #     "📄  Tailor My Resume",
+                #     "✉️  Write Cover Letter",
+                #     "💬  Chat with Agent"
+                # ])
                 a_tab1, a_tab2, a_tab3, a_tab4 = st.tabs([
-                    "📄  Tailor My Resume",
-                    "✉️  Write Cover Letter",
-                    "💬  Chat with Agent",
-                    "🚀  Auto Apply"
-                ])
+                      "📄  Tailor My Resume",
+                      "✉️  Write Cover Letter",
+                      "💬  Chat with Agent",
+                      "🚀  Auto Apply"
+                 ])
 
+                # # Tab A — Tailor Resume (FIX 5: full resume)
+                # with a_tab1:
+                #     st.markdown(f"Rewriting your resume specifically for **{title}** at **{company}**")
+                #     if not resume:
+                #         st.warning("⚠️ Upload a resume or type your skills above first.")
+                #     else:
+                #         if st.button("✨ Generate Full Tailored Resume", key=f"tailor_{i}", type="primary"):
+                #             with st.spinner("Writing your complete tailored resume... (30-45 seconds)"):
+                #                 tailored = tailor_resume(resume, doc)
+                #                 st.session_state.tailored_resume[i] = tailored
+
+                #         if st.session_state.tailored_resume.get(i):
+                #             st.success("✅ Full tailored resume ready!")
+                #             st.markdown(f"<div class='output-box'>{st.session_state.tailored_resume[i]}</div>", unsafe_allow_html=True)
+                #             st.download_button(
+                #                 "⬇️ Download Tailored Resume (.txt)",
+                #                 data=st.session_state.tailored_resume[i],
+                #                 file_name=f"resume_{title.replace(' ','_')}_{company.replace(' ','_')}.txt",
+                #                 mime="text/plain",
+                #                 key=f"dl_resume_{i}"
+                #             )
                 # Tab A — Tailor Resume with Editable Text + PDF Download
                 with a_tab1:
                     st.markdown(f"Tailoring your resume specifically for **{title}** at **{company}**")
@@ -963,6 +978,7 @@ with tab1:
                         if st.session_state.tailored_resume.get(i):
                             st.success("✅ Full tailored resume ready! You can edit it below before downloading.")
 
+                            # Editable text area
                             edited_resume = st.text_area(
                                 "✏️ Edit your resume here",
                                 value=st.session_state.tailored_resume[i],
@@ -970,13 +986,21 @@ with tab1:
                                 key=f"edit_resume_{i}",
                                 label_visibility="visible"
                             )
+
+                            # Save edits back to session state
                             st.session_state.tailored_resume[i] = edited_resume
 
                             st.markdown("<br>", unsafe_allow_html=True)
+
+                            # Download buttons side by side
                             dl_col1, dl_col2 = st.columns(2)
 
                             with dl_col1:
-                                pdf_buffer = convert_to_pdf(edited_resume, f"resume_{title}_{company}")
+                                # Download as PDF
+                                pdf_buffer = convert_to_pdf(
+                                    edited_resume,
+                                    f"resume_{title}_{company}"
+                                )
                                 st.download_button(
                                     "⬇️ Download as PDF",
                                     data=pdf_buffer,
@@ -985,7 +1009,9 @@ with tab1:
                                     key=f"dl_resume_pdf_{i}",
                                     type="primary"
                                 )
+
                             with dl_col2:
+                                # Download as TXT
                                 st.download_button(
                                     "⬇️ Download as TXT",
                                     data=edited_resume,
@@ -1008,20 +1034,30 @@ with tab1:
                         if st.session_state.cover_letter.get(i):
                             st.success("✅ Cover letter ready! You can edit it below before downloading.")
 
+                            # Editable text area
                             edited_letter = st.text_area(
                                 "✏️ Edit your cover letter here",
                                 value=st.session_state.cover_letter[i],
                                 height=400,
                                 key=f"edit_cover_{i}",
+
                                 label_visibility="visible"
                             )
+
+                            # Save edits back to session state
                             st.session_state.cover_letter[i] = edited_letter
 
                             st.markdown("<br>", unsafe_allow_html=True)
+
+                            # Download buttons side by side
                             dl_col1, dl_col2 = st.columns(2)
 
                             with dl_col1:
-                                pdf_buffer = convert_to_pdf(edited_letter, f"cover_letter_{company}")
+                                # Download as PDF
+                                pdf_buffer = convert_to_pdf(
+                                    edited_letter,
+                                    f"cover_letter_{company}"
+                                )
                                 st.download_button(
                                     "⬇️ Download as PDF",
                                     data=pdf_buffer,
@@ -1030,7 +1066,9 @@ with tab1:
                                     key=f"dl_cover_pdf_{i}",
                                     type="primary"
                                 )
+
                             with dl_col2:
+                                # Download as TXT
                                 st.download_button(
                                     "⬇️ Download as TXT",
                                     data=edited_letter,
@@ -1038,6 +1076,27 @@ with tab1:
                                     mime="text/plain",
                                     key=f"dl_cover_txt_{i}"
                                 )
+                # # Tab B — Cover Letter
+                # with a_tab2:
+                #     st.markdown(f"Writing a cover letter for **{title}** at **{company}**")
+                #     if not resume:
+                #         st.warning("⚠️ Upload a resume or type your skills above first.")
+                #     else:
+                #         if st.button("✨ Generate Cover Letter", key=f"cover_{i}", type="primary"):
+                #             with st.spinner("Writing your cover letter..."):
+                #                 letter = write_cover_letter(resume, doc, company, title)
+                #                 st.session_state.cover_letter[i] = letter
+
+                #         if st.session_state.cover_letter.get(i):
+                #             st.success("✅ Cover letter ready!")
+                #             st.markdown(f"<div class='output-box'>{st.session_state.cover_letter[i]}</div>", unsafe_allow_html=True)
+                #             st.download_button(
+                #                 "⬇️ Download Cover Letter (.txt)",
+                #                 data=st.session_state.cover_letter[i],
+                #                 file_name=f"cover_letter_{company.replace(' ','_')}.txt",
+                #                 mime="text/plain",
+                #                 key=f"dl_cover_{i}"
+                #             )
 
                 # Tab C — Chat
                 with a_tab3:
@@ -1078,7 +1137,7 @@ with tab1:
                             st.session_state.chat_history[i] = []
                             st.rerun()
 
-                # Tab D — Auto Apply
+# Tab D — Auto Apply
                 with a_tab4:
                     st.markdown(f"Auto-apply for **{title}** at **{company}**")
                     st.warning("⚠️ This gives the AI agent permission to act on your behalf. Always review before final submission.")
@@ -1127,47 +1186,21 @@ with tab1:
 
                     elif found == "none":
                         st.info("No direct application email found in this posting. Use the assisted web form filler instead:")
-
-                        IS_CLOUD = "STREAMLIT_RUNTIME_ENV" in os.environ or "HOSTNAME" in os.environ and "streamlit" in os.environ.get("HOSTNAME", "").lower()
-
-                    # ...inside the elif found == "none": block...
-                    if IS_CLOUD:
-                        st.info("🖥️ This feature is demonstrated locally during live presentations. Core matching, analysis, and email-apply are fully live here.")
-                    else:
-                        if st.button("🌐 Preview Auto-Filled Application", key=f"webform_{i}"):
+                        if st.button("🌐 Open & Auto-Fill Application Form", key=f"webform_{i}"):
                             if not job_url:
                                 st.error("No application URL available for this job.")
                             elif not (applicant_name and applicant_email):
                                 st.error("Please fill in your name and email above first.")
                             else:
-                                applicant_info = {'name': applicant_name, 'email': applicant_email, 'phone': applicant_phone}
-                                with st.spinner("Filling the application form..."):
-                                    filled, screenshot, error = auto_fill_web_form(job_url, applicant_info)
-                                if error:
-                                    st.error(f"Could not fill this form automatically: {error}")
-                                    st.markdown(f"[🔗 Open this application page yourself instead]({job_url})")
-                                else:
-                                    st.success(f"✅ Auto-filled: {', '.join(filled) if filled else 'no fields detected'}")
-                                    if screenshot:
-                                        st.image(screenshot, caption="Preview of the auto-filled application")
-                                    st.markdown(f"[🔗 Open this application page yourself to review and submit]({job_url})")
-                        
-                        # if st.button("🌐 Open & Auto-Fill Application Form", key=f"webform_{i}"):
-                        #     if not job_url:
-                        #         st.error("No application URL available for this job.")
-                        #     elif not (applicant_name and applicant_email):
-                        #         st.error("Please fill in your name and email above first.")
-                        #     else:
-                        #         applicant_info = {
-                        #             'name': applicant_name,
-                        #             'email': applicant_email,
-                        #             'phone': applicant_phone,
-                        #             'resume_path': None
-                        #         }
-                        #         with st.spinner("Opening browser and filling form... check your taskbar"):
-                        #             filled = auto_fill_web_form(job_url, applicant_info)
-                        #         st.success(f"✅ Auto-filled: {', '.join(filled) if filled else 'no fields detected'}. A browser window has opened — please review and click submit yourself.")
-
+                                applicant_info = {
+                                    'name': applicant_name,
+                                    'email': applicant_email,
+                                    'phone': applicant_phone,
+                                    'resume_path': None
+                                }
+                                with st.spinner("Opening browser and filling form... check your taskbar"):
+                                    filled = auto_fill_web_form(job_url, applicant_info)
+                                st.success(f"✅ Auto-filled: {', '.join(filled) if filled else 'no fields detected'}. A browser window has opened — please review and click submit yourself.")
             st.markdown("<br>", unsafe_allow_html=True)
 
 
@@ -1243,9 +1276,6 @@ with tab3:
                 st.session_state.pathway_results = pathway_results
                 st.session_state.pathway_skills = candidate_skills
 
-        if st.session_state.pathway_results is not None and len(st.session_state.pathway_results) == 0:
-            st.warning("No strong pathway matches found for the detected skills. Try adding more specific technical or domain skills.")
-
         if st.session_state.get('pathway_results'):
             skills = st.session_state.pathway_skills
             st.markdown("**Skills detected in your profile:**")
@@ -1266,18 +1296,16 @@ with tab3:
     <div style='margin-top:10px; font-size:0.85rem; color:#334155;'><b>📈 Skills to develop:</b><br>{missing_html}</div>
 </div>
                 """, unsafe_allow_html=True)
+                st.markdown("<div class='section-title' style='margin-top:32px;'>🕸️ Interactive Skill Graph</div>", unsafe_allow_html=True)
+        st.markdown("""
+        <div style='font-size:0.85rem; color:#64748B; margin-bottom:12px;'>
+        🟣 You &nbsp;·&nbsp; 🔵 Your skills &nbsp;·&nbsp; 🟢 Recommended roles &nbsp;·&nbsp; 🟠 Skills to develop
+        <br>Drag nodes, scroll to zoom.
+        </div>
+        """, unsafe_allow_html=True)
 
-            # Interactive graph — runs ONCE after all cards, not inside the loop
-            st.markdown("<div class='section-title' style='margin-top:32px;'>🕸️ Interactive Skill Graph</div>", unsafe_allow_html=True)
-            st.markdown("""
-            <div style='font-size:0.85rem; color:#64748B; margin-bottom:12px;'>
-            🟣 You &nbsp;·&nbsp; 🔵 Your skills &nbsp;·&nbsp; 🟢 Recommended roles &nbsp;·&nbsp; 🟠 Skills to develop
-            <br>Drag nodes, scroll to zoom.
-            </div>
-            """, unsafe_allow_html=True)
-
-            graph_html = build_pathway_network_html(
-                st.session_state.pathway_skills,
-                st.session_state.pathway_results
-            )
-            components.html(graph_html, height=620, scrolling=False)
+        graph_html = build_pathway_network_html(
+            st.session_state.pathway_skills,
+            st.session_state.pathway_results
+        )
+        components.html(graph_html, height=620, scrolling=False)                        

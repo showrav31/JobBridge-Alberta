@@ -22,20 +22,7 @@
 ### 1. Clone the repo
 git clone https://github.com/showrav31/JobBridge-Alberta.git
 cd JobBridge-Alberta
-## API Keys Setup
 
-This project requires two free API keys.
-Create a `.env` file in the root folder:
-
-ANTHROPIC_API_KEY=your-key-here
-GROQ_API_KEY=your-key-here
-
-Get your free keys here:
-- Anthropic: https://console.anthropic.com
-- Groq: https://console.groq.com
-
-Note: The .env file is excluded from GitHub for security.
-You must create it manually after cloning.
 
 ### 2. Create virtual environment
 python -m venv venv
@@ -50,6 +37,22 @@ ANTHROPIC_API_KEY=your-key-here
 GROQ_API_KEY=your-key-here
 
 Or paste them directly in app.py at the top.
+
+
+## API Keys Setup
+
+This project requires two free API keys.
+Create a `.env` file in the root folder:
+
+ANTHROPIC_API_KEY=your-key-here
+GROQ_API_KEY=your-key-here
+
+Get your free keys here:
+- Anthropic: https://console.anthropic.com
+- Groq: https://console.groq.com
+
+Note: The .env file is excluded from GitHub for security.
+You must create it manually after cloning.
 
 ### 5. Set up the database
 python setup_db.py

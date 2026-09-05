@@ -1,6 +1,8 @@
 __import__('pysqlite3')
 import sys
 sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+import os
+IS_CLOUD = "STREAMLIT_RUNTIME_ENV" in os.environ or ("HOSTNAME" in os.environ and "streamlit" in os.environ.get("HOSTNAME", "").lower())
 
 import streamlit as st
 import sqlite3

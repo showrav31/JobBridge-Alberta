@@ -1,3 +1,7 @@
+__import__('pysqlite3')
+import sys
+sys.modules['sqlite3'] = sys.modules.pop('pysqlite3')
+
 import streamlit as st
 import sqlite3
 import pandas as pd
@@ -550,7 +554,7 @@ def tailor_resume(resume_text, job_description):
     # FIX 5: max_tokens=4000 + strict instructions = full resume always
     client = get_groq_client()
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",
@@ -588,7 +592,7 @@ Rules:
 def write_cover_letter(resume_text, job_description, company_name, job_title):
     client = get_groq_client()
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=[
             {
                 "role": "system",
@@ -644,7 +648,7 @@ Always be specific to THIS exact job and company. Be encouraging and practical."
     messages.append({"role": "user", "content": user_message})
 
     response = client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
+        model="openai/gpt-oss-120b",
         messages=messages,
         max_tokens=1000,
         temperature=0.7

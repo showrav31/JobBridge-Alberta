@@ -1,5 +1,6 @@
 streamlit
 chromadb
+pysqlite3-binary
 sentence-transformers
 anthropic
 groq
@@ -7,3 +8,6 @@ pandas
 PyPDF2
 python-dotenv
 altair
+reportlab
+numpy
+pyvis
